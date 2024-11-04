@@ -2,10 +2,12 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 const PINATA_API_URL = 'https://api.pinata.cloud';
+const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY;
+const PINATA_JWT = import.meta.env.VITE_PINATA_JWT;
 
 export class PinataService {
   private static instance: PinataService;
-  private jwt: string | null = 'demo_jwt'; // Demo JWT for testing
+  private jwt: string | null = PINATA_JWT || 'demo_jwt';
 
   private constructor() {}
 
@@ -27,6 +29,16 @@ export class PinataService {
   }
 
   async uploadFile(file: File): Promise<string> {
+    if (!this.jwt || this.jwt === 'demo_jwt') {
+      // Demo implementation for testing
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const mockHash = 'Qm' + Math.random().toString(36).substr(2, 32);
+          resolve(mockHash);
+        }, 1500);
+      });
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -39,21 +51,45 @@ export class PinataService {
     });
     formData.append('pinataMetadata', metadata);
 
-    // Demo implementation for testing
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockHash = 'Qm' + Math.random().toString(36).substr(2, 32);
-        resolve(mockHash);
-      }, 1500);
-    });
+    try {
+      const response = await axios.post(
+        `${PINATA_API_URL}/pinning/pinFileToIPFS`,
+        formData,
+        {
+          headers: {
+            ...this.getHeaders(),
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return response.data.IpfsHash;
+    } catch (error) {
+      console.error('Pinata upload error:', error);
+      throw new Error('Failed to upload file to IPFS');
+    }
   }
 
   async verifyFile(hash: string): Promise<boolean> {
-    // Demo implementation for testing
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(true);
-      }, 1000);
-    });
+    if (!this.jwt || this.jwt === 'demo_jwt') {
+      // Demo implementation for testing
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(Math.random() > 0.1); // 90% success rate for demo
+        }, 1000);
+      });
+    }
+
+    try {
+      const response = await axios.get(
+        `${PINATA_API_URL}/data/pinList?status=pinned&hashContains=${hash}`,
+        { headers: this.getHeaders() }
+      );
+
+      return response.data.rows.length > 0;
+    } catch (error) {
+      console.error('Pinata verification error:', error);
+      throw new Error('Failed to verify file on IPFS');
+    }
   }
 }

@@ -1,10 +1,16 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Credential } from '../types';
 
 interface CredentialState {
   credentials: Credential[];
+  isLoading: boolean;
+  error: string | null;
   addCredential: (credential: Credential) => void;
   updateCredential: (id: string, updates: Partial<Credential>) => void;
+  deleteCredential: (id: string) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
 }
 
 const sampleCredentials: Credential[] = [
@@ -28,16 +34,35 @@ const sampleCredentials: Credential[] = [
   },
 ];
 
-export const useCredentialStore = create<CredentialState>((set) => ({
-  credentials: sampleCredentials,
-  addCredential: (credential) =>
-    set((state) => ({
-      credentials: [...state.credentials, credential],
-    })),
-  updateCredential: (id, updates) =>
-    set((state) => ({
-      credentials: state.credentials.map((cred) =>
-        cred.id === id ? { ...cred, ...updates } : cred
-      ),
-    })),
-}));
+export const useCredentialStore = create<CredentialState>()(
+  persist(
+    (set) => ({
+      credentials: sampleCredentials,
+      isLoading: false,
+      error: null,
+      addCredential: (credential) =>
+        set((state) => ({
+          credentials: [...state.credentials, credential],
+          error: null,
+        })),
+      updateCredential: (id, updates) =>
+        set((state) => ({
+          credentials: state.credentials.map((cred) =>
+            cred.id === id ? { ...cred, ...updates } : cred
+          ),
+          error: null,
+        })),
+      deleteCredential: (id) =>
+        set((state) => ({
+          credentials: state.credentials.filter((cred) => cred.id !== id),
+          error: null,
+        })),
+      setLoading: (loading) => set({ isLoading: loading }),
+      setError: (error) => set({ error }),
+    }),
+    {
+      name: 'credential-storage',
+      skipHydration: false,
+    }
+  )
+);
